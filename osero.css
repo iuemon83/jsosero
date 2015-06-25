@@ -1,0 +1,10 @@
+#bord td{
+    width: 40px;
+    height: 40px;
+    text-align: center;
+}
+
+#bord, #bord td {
+    border: 1px black solid;
+    border-collapse: collapse;
+}
