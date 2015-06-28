@@ -1,8 +1,3 @@
-var Position = function(x, y) {
-    this.x = x;
-    this.y = y;
-};
-
 var Osero = (function() {
     return function Osero(bordId, numberOfRow, numberOfColumn) {
         this.blackStone = '●';
@@ -32,9 +27,13 @@ var Osero = (function() {
         $bord.find('td').on('click', function() {
             var y = Number($(this).attr('id').split('_')[0]);
             var x = Number($(this).attr('id').split('_')[1]);
+            var position = {
+                x: x,
+                y: y
+            };
 
-            if (!self.isSetable(x, y)) return;
-            self.set(x, y);
+            if (!self.isSetable(position)) return;
+            self.set(position);
             self.toNextTurn();
         });
 
@@ -79,7 +78,11 @@ var Osero = (function() {
             var setableCount = 0;
             for (var y = 0; y < numberOfRow; y++) {
                 for (var x = 0; x < numberOfColumn; x++) {
-                    if (this.isSetable(x, y)) {
+                    var position = {
+                        x: x,
+                        y: y
+                    };
+                    if (this.isSetable(position)) {
                         setableCount++;
                         rowList[y][x].addClass('setable');
                     } else {
@@ -115,59 +118,59 @@ var Osero = (function() {
         };
 
         // 指定したマスに石をセット出来る場合はTrue、そうでなければFalse を返す
-        this.isSetable = function(x, y) {
-            if (rowList[y][x].text() !== '') return false;
-            return getReversablePositions(x, y, this.currentStone).length !== 0;
+        this.isSetable = function(position) {
+            if (rowList[position.y][position.x].text() !== '') return false;
+            return getReversablePositions(position, this.currentStone).length !== 0;
         };
 
         // 指定したマスに石をセットする
-        this.set = function(x, y) {
-            if (rowList[y][x].text() !== '') return;
+        this.set = function(position) {
+            if (rowList[position.y][position.x].text() !== '') return;
 
-            rowList[y][x].text(this.currentStone);
+            rowList[position.y][position.x].text(this.currentStone);
 
-            getReversablePositions(x, y, this.currentStone).forEach(function(position) {
+            getReversablePositions(position, this.currentStone).forEach(function(position) {
                 rowList[position.y][position.x].text(this.currentStone);
             }, this);
         };
 
         // 指定したマスに石をセットした場合に、ひっくり返すことができるマスの一覧を取得する
-        var getReversablePositions = function(setStoneX, setStoneY, setStone) {
+        var getReversablePositions = function(setPosition, setStone) {
             var reverseStone = setStone === self.blackStone ? self.whiteStone : self.blackStone;
 
             var reversablePositionList = [];
 
             // 左
-            reversablePositionList = reversablePositionList.concat(getReversableStraightLine(setStoneX, setStoneY, setStone, -1, 0, reverseStone));
+            reversablePositionList = reversablePositionList.concat(getReversableStraightLine(setPosition, setStone, -1, 0, reverseStone));
 
             // 右
-            reversablePositionList = reversablePositionList.concat(getReversableStraightLine(setStoneX, setStoneY, setStone, 1, 0, reverseStone));
+            reversablePositionList = reversablePositionList.concat(getReversableStraightLine(setPosition, setStone, 1, 0, reverseStone));
 
             // 上
-            reversablePositionList = reversablePositionList.concat(getReversableStraightLine(setStoneX, setStoneY, setStone, 0, -1, reverseStone));
+            reversablePositionList = reversablePositionList.concat(getReversableStraightLine(setPosition, setStone, 0, -1, reverseStone));
 
             // 下
-            reversablePositionList = reversablePositionList.concat(getReversableStraightLine(setStoneX, setStoneY, setStone, 0, 1, reverseStone));
+            reversablePositionList = reversablePositionList.concat(getReversableStraightLine(setPosition, setStone, 0, 1, reverseStone));
 
             // 左斜め上
-            reversablePositionList = reversablePositionList.concat(getReversableStraightLine(setStoneX, setStoneY, setStone, -1, -1, reverseStone));
+            reversablePositionList = reversablePositionList.concat(getReversableStraightLine(setPosition, setStone, -1, -1, reverseStone));
 
             // 左斜め下
-            reversablePositionList = reversablePositionList.concat(getReversableStraightLine(setStoneX, setStoneY, setStone, -1, 1, reverseStone));
+            reversablePositionList = reversablePositionList.concat(getReversableStraightLine(setPosition, setStone, -1, 1, reverseStone));
 
             // 右斜め上
-            reversablePositionList = reversablePositionList.concat(getReversableStraightLine(setStoneX, setStoneY, setStone, 1, -1, reverseStone));
+            reversablePositionList = reversablePositionList.concat(getReversableStraightLine(setPosition, setStone, 1, -1, reverseStone));
 
             // 右斜め下
-            reversablePositionList = reversablePositionList.concat(getReversableStraightLine(setStoneX, setStoneY, setStone, 1, 1, reverseStone));
+            reversablePositionList = reversablePositionList.concat(getReversableStraightLine(setPosition, setStone, 1, 1, reverseStone));
 
             return reversablePositionList;
         }
 
         // 指定したマスに石をセットした場合に、指定した方向のひっくり返すことができるマスの一覧を取得する
-        getReversableStraightLine = function(x, y, stone, dx, dy, reverseStone) {
-            var xx = x + dx;
-            var yy = y + dy;
+        getReversableStraightLine = function(position, stone, dx, dy, reverseStone) {
+            var xx = position.x + dx;
+            var yy = position.y + dy;
             if (inBord(xx, yy) && rowList[yy][xx].text() === reverseStone) {
 
                 var exists = false;
