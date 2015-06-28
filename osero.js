@@ -1,106 +1,208 @@
+var Position = function(x, y) {
+    this.x = x;
+    this.y = y;
+};
+
 var Osero = (function() {
     return function Osero(bordId, numberOfRow, numberOfColumn) {
-        var blackStone = '●';
-        var whiteStone = '○';
+        this.blackStone = '●';
+        this.whiteStone = '○';
+        this.currentStone = this.blackStone;
+        this.totalTurnCount = 0;
+
+        this.onTurnStart = function() {};
+        this.onFinish = function() {};
+
         var $bord = $('#' + bordId);
 
-        var masuList = [];
+        var rowList = [];
         for (var row = 0; row < numberOfRow; row++) {
             var $tr = $('<tr>');
             $bord.append($tr);
 
-            masuList.push([]);
+            rowList.push([]);
             for (var column = 0; column < numberOfColumn; column++) {
                 var $td = $('<td id="' + row + '_' + column + '"></td>');
                 $tr.append($td);
-                masuList[masuList.length - 1].push($td);
+                rowList[rowList.length - 1].push($td);
             }
         }
 
-        // 中央に4つ置く
-        masuList[3][3].text(whiteStone);
-        masuList[3][4].text(blackStone);
-        masuList[4][3].text(blackStone);
-        masuList[4][4].text(whiteStone);
-
         var self = this;
         $bord.find('td').on('click', function() {
-            var row = Number($(this).attr('id').split('_')[0]);
-            var column = Number($(this).attr('id').split('_')[1]);
-            self.set(column, row);
+            var y = Number($(this).attr('id').split('_')[0]);
+            var x = Number($(this).attr('id').split('_')[1]);
+
+            if (!self.isSetable(x, y)) return;
+            self.set(x, y);
+            self.toNextTurn();
         });
 
-        var nextStone = blackStone;
-        this.set = function(x, y) {
-            if (masuList[y][x].text() !== '') return;
+        // オセロの開始
+        this.start = function() {
+            // 中央に4つ置く
+            rowList[3][3].text(this.whiteStone);
+            rowList[3][4].text(this.blackStone);
+            rowList[4][3].text(this.blackStone);
+            rowList[4][4].text(this.whiteStone);
 
-            masuList[y][x].text(nextStone);
-
-            reverseStones(x, y, nextStone);
-
-            nextStone = nextStone === blackStone ? whiteStone : blackStone;
+            this.startTurn();
         };
 
-        var reverseStones = function(newStoneX, newStoneY, newStone) {
-            var reverseStone = newStone === blackStone ? whiteStone : blackStone;
+        // オセロの終了
+        this.finish = function() {
+            var blackCount = 0;
+            var whiteCount = 0;
+            rowList.forEach(function(row) {
+                row.forEach(function(masu) {
+                    if (masu.text() === this.blackStone) {
+                        blackCount++;
+                    } else {
+                        whiteCount++;
+                    }
+                }, this);
+            }, this);
 
-            var column;
-            var row;
+            this.onFinish({
+                blackCount: blackCount,
+                whiteCount: whiteCount
+            });
+        };
+
+        var skipCount = 0;
+
+        // ターンの開始
+        this.startTurn = function() {
+            this.totalTurnCount++;
+
+            // 石をセット可能なマスに色を付ける
+            var setableCount = 0;
+            for (var y = 0; y < numberOfRow; y++) {
+                for (var x = 0; x < numberOfColumn; x++) {
+                    if (this.isSetable(x, y)) {
+                        setableCount++;
+                        rowList[y][x].addClass('setable');
+                    } else {
+                        rowList[y][x].removeClass('setable');
+                    }
+                }
+            }
+
+            if (setableCount === 0) {
+                if (skipCount > 2) {
+                    this.finish();
+                } else {
+                    skipCount++;
+                    this.toNextTurn();
+                }
+            } else {
+                skipCount = 0;
+                this.onTurnStart({
+                    stone: this.currentStone
+                });
+            }
+        };
+
+        // 次のターンへ
+        this.toNextTurn = function() {
+            if (numberOfRow * numberOfColumn === this.totalTurnCount) {
+                this.finish();
+                return;
+            }
+
+            this.currentStone = this.currentStone === this.blackStone ? this.whiteStone : this.blackStone;
+            this.startTurn();
+        };
+
+        // 指定したマスに石をセット出来る場合はTrue、そうでなければFalse を返す
+        this.isSetable = function(x, y) {
+            if (rowList[y][x].text() !== '') return false;
+            return getReversablePositions(x, y, this.currentStone).length !== 0;
+        };
+
+        // 指定したマスに石をセットする
+        this.set = function(x, y) {
+            if (rowList[y][x].text() !== '') return;
+
+            rowList[y][x].text(this.currentStone);
+
+            getReversablePositions(x, y, this.currentStone).forEach(function(position) {
+                rowList[position.y][position.x].text(this.currentStone);
+            }, this);
+        };
+
+        // 指定したマスに石をセットした場合に、ひっくり返すことができるマスの一覧を取得する
+        var getReversablePositions = function(setStoneX, setStoneY, setStone) {
+            var reverseStone = setStone === self.blackStone ? self.whiteStone : self.blackStone;
+
+            var reversablePositionList = [];
 
             // 左
-            reverseStraightLine(newStoneX, newStoneY, newStone, -1, 0, reverseStone);
+            reversablePositionList = reversablePositionList.concat(getReversableStraightLine(setStoneX, setStoneY, setStone, -1, 0, reverseStone));
 
             // 右
-            reverseStraightLine(newStoneX, newStoneY, newStone, 1, 0, reverseStone);
+            reversablePositionList = reversablePositionList.concat(getReversableStraightLine(setStoneX, setStoneY, setStone, 1, 0, reverseStone));
 
             // 上
-            reverseStraightLine(newStoneX, newStoneY, newStone, 0, -1, reverseStone);
+            reversablePositionList = reversablePositionList.concat(getReversableStraightLine(setStoneX, setStoneY, setStone, 0, -1, reverseStone));
 
             // 下
-            reverseStraightLine(newStoneX, newStoneY, newStone, 0, 1, reverseStone);
+            reversablePositionList = reversablePositionList.concat(getReversableStraightLine(setStoneX, setStoneY, setStone, 0, 1, reverseStone));
 
             // 左斜め上
-            reverseStraightLine(newStoneX, newStoneY, newStone, -1, -1, reverseStone);
+            reversablePositionList = reversablePositionList.concat(getReversableStraightLine(setStoneX, setStoneY, setStone, -1, -1, reverseStone));
 
             // 左斜め下
-            reverseStraightLine(newStoneX, newStoneY, newStone, -1, 1, reverseStone);
+            reversablePositionList = reversablePositionList.concat(getReversableStraightLine(setStoneX, setStoneY, setStone, -1, 1, reverseStone));
 
             // 右斜め上
-            reverseStraightLine(newStoneX, newStoneY, newStone, 1, -1, reverseStone);
+            reversablePositionList = reversablePositionList.concat(getReversableStraightLine(setStoneX, setStoneY, setStone, 1, -1, reverseStone));
 
             // 右斜め下
-            reverseStraightLine(newStoneX, newStoneY, newStone, 1, 1, reverseStone);
-        };
+            reversablePositionList = reversablePositionList.concat(getReversableStraightLine(setStoneX, setStoneY, setStone, 1, 1, reverseStone));
 
-        var reverseStraightLine = function(x, y, stone, dx, dy, reverseStone) {
+            return reversablePositionList;
+        }
+
+        // 指定したマスに石をセットした場合に、指定した方向のひっくり返すことができるマスの一覧を取得する
+        getReversableStraightLine = function(x, y, stone, dx, dy, reverseStone) {
             var xx = x + dx;
             var yy = y + dy;
-            if (inBord(xx, yy) && masuList[yy][xx].text() === reverseStone) {
+            if (inBord(xx, yy) && rowList[yy][xx].text() === reverseStone) {
 
                 var exists = false;
 
                 var xi = xx;
                 var yi = yy;
                 while (inBord(xi, yi)) {
-                    exists = exists || masuList[yi][xi].text() === stone;
+                    exists = exists || rowList[yi][xi].text() === stone;
 
                     xi += dx;
                     yi += dy;
                 }
 
+                var result = [];
                 if (exists) {
                     xi = xx;
                     yi = yy;
-                    while (inBord(xi, yi) && masuList[yi][xi].text() === reverseStone) {
-                        masuList[yi][xi].text(stone);
+                    while (inBord(xi, yi) && rowList[yi][xi].text() === reverseStone) {
+                        result.push({
+                            x: xi,
+                            y: yi
+                        });
 
                         xi += dx;
                         yi += dy;
                     }
                 }
+
+                return result;
+            } else {
+                return [];
             }
         };
 
+        // 指定した座標がボード内に収まっている場合はTrue、そうでなければFalse を返す
         var inBord = function(x, y) {
             return x >= 0 &&
                 x < numberOfColumn &&
@@ -112,4 +214,17 @@ var Osero = (function() {
 
 $(function() {
     var osero = new Osero('bord', 8, 8);
+
+    var $message = $('#message');
+    osero.onTurnStart = function(e) {
+        var message = (e.stone === osero.blackStone ? '黒' : '白') + 'の番です。';
+        $message.text(message);
+    };
+
+    osero.onFinish = function(e) {
+        var message = e.blackCount + '対' + e.whiteCount + 'で' + (e.blackCount > e.whiteCount ? '黒' : '白') + 'の勝ちです';
+        $message.text(message);
+    };
+
+    osero.start();
 });
